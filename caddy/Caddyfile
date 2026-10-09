@@ -1,0 +1,5 @@
+# Caddy pide y renueva el certificado de Let's Encrypt solo.
+# El WebSocket (wss://) pasa sin configuracion extra.
+{$DOMAIN} {
+	reverse_proxy nginx:80
+}

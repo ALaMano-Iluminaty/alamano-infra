@@ -1,0 +1,168 @@
+# ALaManoApp completo. Los servicios se construyen desde los repos hermanos.
+#
+#   Local:  docker compose up --build            -> http://localhost:8080
+#   VM:     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Estructura esperada (todos en la misma carpeta):
+#   ALaMano/alamano-infra, alamano-auth-service, alamano-core-service,
+#           alamano-realtime-gateway, alamano-frontend
+
+name: alamano
+
+networks:
+  alamano-net:
+
+volumes:
+  alamano_pg_data:
+  alamano_rabbitmq_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: alamano-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-postgres}
+      POSTGRES_DB: alamano
+      AUTH_DB_USER: ${AUTH_DB_USER:-auth_app}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:-auth_app}
+      CORE_DB_USER: ${CORE_DB_USER:-core_app}
+      CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:-core_app}
+    volumes:
+      - alamano_pg_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-postgres} -d alamano"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [alamano-net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: alamano-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [alamano-net]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: alamano-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-alamano}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-alamano}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - alamano_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    networks: [alamano-net]
+
+  auth-service:
+    build: ../alamano-auth-service
+    image: ghcr.io/alamano-iluminaty/alamano-auth-service:latest
+    container_name: alamano-auth-service
+    environment:
+      # Auth lee las llaves como rutas de archivo (Files.readString), sin prefijo.
+      JWT_PRIVATE_KEY_PATH: /keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /keys/jwt-public.pem
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/alamano?currentSchema=auth
+      SPRING_DATASOURCE_USERNAME: ${AUTH_DB_USER:-auth_app}
+      SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:-auth_app}
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  core-service:
+    build: ../alamano-core-service
+    image: ghcr.io/alamano-iluminaty/alamano-core-service:latest
+    container_name: alamano-core-service
+    environment:
+      # OJO: el Core la lee como recurso de Spring, por eso lleva el prefijo file:
+      # y la variable se llama LOCATION, no PATH. Con el nombre equivocado usa la
+      # llave de prueba que trae empaquetada y rechaza todos los tokens (401).
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/alamano?currentSchema=core
+      SPRING_DATASOURCE_USERNAME: ${CORE_DB_USER:-core_app}
+      SPRING_DATASOURCE_PASSWORD: ${CORE_DB_PASSWORD:-core_app}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-alamano}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-alamano}
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  # --- Pendientes: necesitan un Dockerfile en su repo (ver Dockerfile.template) ---
+  # Mientras no exista, levanta solo lo de arriba:
+  #   docker compose up -d postgres redis rabbitmq auth-service core-service nginx
+
+  realtime-gateway:
+    profiles: [gateway]
+    build: ../alamano-realtime-gateway
+    container_name: alamano-realtime-gateway
+    environment:
+      # CONFIRMAR con Sebastian los nombres exactos de su application.yml
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-alamano}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-alamano}
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  frontend:
+    profiles: [frontend]
+    build: ../alamano-frontend
+    container_name: alamano-frontend
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: alamano-nginx
+    ports:
+      - "${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth-service
+      - core-service
+    restart: unless-stopped
+    networks: [alamano-net]

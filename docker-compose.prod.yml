@@ -1,0 +1,27 @@
+# Override para la VM: Caddy adelante, saca y renueva el certificado HTTPS solo.
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Requiere DOMAIN en el .env, por ejemplo alamano.eastus.cloudapp.azure.com
+
+services:
+  nginx:
+    ports: !reset []          # ya no se publica: solo Caddy habla con internet
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: alamano-caddy
+    environment:
+      DOMAIN: ${DOMAIN:?Falta DOMAIN en el .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [nginx]
+    restart: unless-stopped
+    networks: [alamano-net]
+
+volumes:
+  caddy_data:
+  caddy_config:
