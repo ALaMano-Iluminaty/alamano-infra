@@ -2,13 +2,29 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # Requiere DOMAIN en el .env, por ejemplo alamano.eastus.cloudapp.azure.com
 
+# Memoria: los dos servicios Java arrancan con -XX:MaxRAMPercentage=75, que es
+# el 75% de lo que el contenedor VE. Sin mem_limit cada JVM ve toda la RAM de la
+# VM y pide el 75% para si sola; con dos, la maquina se queda sin memoria.
+# Con mem_limit cada JVM se dimensiona contra su propio limite.
+# Los valores de abajo suman ~2.7 GB y asumen una VM de 4 GB (B2s).
+# Para una de 2 GB (B1ms): auth y core 448m, postgres 256m, rabbitmq 256m, redis 96m.
+
 services:
   # En la VM no se compila: se usan las imagenes que publico el CI al mergear.
   # Asi la VM no necesita clonar los repos de los servicios ni tener Maven.
   auth-service:
     pull_policy: always
+    mem_limit: 640m
   core-service:
     pull_policy: always
+    mem_limit: 640m
+
+  postgres:
+    mem_limit: 512m
+  rabbitmq:
+    mem_limit: 512m
+  redis:
+    mem_limit: 192m
 
   nginx:
     ports: !reset []          # ya no se publica: solo Caddy habla con internet
