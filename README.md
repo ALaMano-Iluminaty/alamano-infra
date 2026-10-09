@@ -66,10 +66,17 @@ la llave de prueba que trae empaquetada y **rechaza todos los tokens**.
 
 ## Desplegar en la VM
 
+La VM **no compila nada**: usa las imagenes que el CI de cada servicio publica en
+GHCR al mergear. Por eso solo hace falta clonar este repo.
+
 ```bash
+git clone https://github.com/ALaMano-Iluminaty/alamano-infra.git
+cd alamano-infra
 bash scripts/bootstrap-vm.sh    # una sola vez: Docker y 2 GB de swap
-# clonar los repos en ~/alamano, generar llaves y escribir el .env real
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+bash scripts/gen-keys.sh
+cp .env.example .env && nano .env
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+BASE=https://$DOMAIN bash scripts/smoke.sh
 ```
 
 En el `.env` de la VM: `DOMAIN` con el nombre DNS real, `POSTGRES_PORT=5432` y **todas**

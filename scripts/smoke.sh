@@ -8,7 +8,9 @@ RUN=$(date +%s)
 ok=0; fallo=0
 check() { if [ "$2" = "$3" ]; then echo "  OK    $1 ($2)"; ok=$((ok+1)); else echo "  FALLA $1: esperaba $3, llego $2"; fallo=$((fallo+1)); fi; }
 
-code() { curl -s -o /tmp/smoke_body -w "%{http_code}" "$@"; }
+BODY=./.smoke_body
+trap 'rm -f "$BODY"' EXIT
+code() { curl -s -o "$BODY" -w "%{http_code}" "$@"; }
 
 echo "Probando $BASE"
 
@@ -19,12 +21,12 @@ check "registro de vendedor" "$C1" "201"
 C2=$(code -X POST "$BASE/auth/login" -H "Content-Type: application/json" \
   -d "{\"correo\":\"v$RUN@test.com\",\"password\":\"Segura123\"}")
 check "login" "$C2" "200"
-TOKEN=$(sed -n 's/.*"token":"\([^"]*\)".*/\1/p' /tmp/smoke_body)
+TOKEN=$(sed -n 's/.*"token":"\([^"]*\)".*/\1/p' "$BODY")
 
 C3=$(code -X POST "$BASE/api/promotions" -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" -d '{"description":"2x1 de humo","totalSlots":5}')
 check "publicar promocion (token del Auth aceptado por el Core)" "$C3" "201"
-ID=$(sed -n 's/.*"id":"\([^"]*\)".*/\1/p' /tmp/smoke_body)
+ID=$(sed -n 's/.*"id":"\([^"]*\)".*/\1/p' "$BODY")
 
 if [ -n "${ID:-}" ]; then
   C4=$(code "$BASE/api/promotions/$ID" -H "Authorization: Bearer $TOKEN")

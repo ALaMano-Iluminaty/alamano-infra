@@ -1,19 +1,20 @@
 #!/bin/bash
-# Actualiza los repos y reconstruye lo que cambio.
+# Actualiza el despliegue de la VM.
 # Uso, parado en alamano-infra:  bash scripts/deploy.sh
+#
+# No compila: descarga las imagenes que el CI publico en GHCR al mergear a la
+# rama principal. Por eso la VM no necesita los repos de los servicios.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-for repo in alamano-auth-service alamano-core-service alamano-realtime-gateway alamano-frontend; do
-  if [ -d "../$repo/.git" ]; then
-    echo ">> git pull $repo"
-    git -C "../$repo" pull --ff-only
-  else
-    echo ">> $repo no esta clonado, se omite"
-  fi
-done
+echo ">> actualizando alamano-infra"
 git pull --ff-only
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+echo ">> descargando imagenes"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+
+echo ">> levantando"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
+
 docker image prune -f
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps

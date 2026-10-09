@@ -1,8 +1,15 @@
 # Override para la VM: Caddy adelante, saca y renueva el certificado HTTPS solo.
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # Requiere DOMAIN en el .env, por ejemplo alamano.eastus.cloudapp.azure.com
 
 services:
+  # En la VM no se compila: se usan las imagenes que publico el CI al mergear.
+  # Asi la VM no necesita clonar los repos de los servicios ni tener Maven.
+  auth-service:
+    pull_policy: always
+  core-service:
+    pull_policy: always
+
   nginx:
     ports: !reset []          # ya no se publica: solo Caddy habla con internet
 
