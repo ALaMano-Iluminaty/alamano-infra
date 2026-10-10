@@ -64,6 +64,24 @@ El Core la lee como recurso de Spring, por eso lleva el prefijo `file:` y la var
 llama `LOCATION`, no `PATH`. Con el nombre equivocado la variable se ignora, el Core usa
 la llave de prueba que trae empaquetada y **rechaza todos los tokens**.
 
+### Permisos de la llave privada en Linux
+
+Los contenedores corren como el usuario `app`, no como el tuyo. Si la llave privada queda
+en `600` y de tu propiedad, el contenedor de Auth **no puede leerla** y muere al arrancar
+con `AccessDeniedException`, reiniciándose en bucle.
+
+`gen-keys.sh` lo resuelve solo: en Linux le da la propiedad del archivo al usuario del
+contenedor, sin abrirlo a todo el mundo. Si alguna vez ves ese error:
+
+```bash
+APPUID=$(docker run --rm --entrypoint id ghcr.io/alamano-iluminaty/alamano-auth-service:latest -u)
+sudo chown $APPUID keys/jwt-private.pem
+docker compose -f docker-compose.yml -f docker-compose.prod.yml restart auth-service
+```
+
+En Docker Desktop sobre Windows o macOS esto no pasa, porque el montaje ignora los
+permisos de Unix. Por eso el fallo aparece recién al desplegar en la VM.
+
 ## Desplegar en la VM
 
 La VM **no compila nada**: usa las imagenes que el CI de cada servicio publica en
