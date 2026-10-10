@@ -37,5 +37,26 @@ fi
 C5=$(code -X POST "$BASE/api/promotions" -H "Content-Type: application/json" -d '{"description":"x","totalSlots":5}')
 check "sin token da 401" "$C5" "401"
 
+# El frontend: nginx le pasa "/" tal cual y el index.html trae el div de React.
+C6=$(code "$BASE/")
+check "frontend responde en /" "$C6" "200"
+if grep -q 'id="root"' "$BODY" 2>/dev/null; then
+  echo "  OK    el index.html es el de la SPA"; ok=$((ok+1))
+else
+  echo "  FALLA / responde pero no parece el index de la SPA"; fallo=$((fallo+1))
+fi
+
+# El Gateway: handshake de WebSocket. 101 = cambio de protocolo aceptado.
+# El token no va aqui, va en el CONNECT de STOMP, asi que esto pasa sin login.
+# La cabecera Origin tiene que estar en ALLOWED_ORIGINS del Gateway.
+WS=$(curl -s -i --http1.1 --max-time 8 \
+  -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: ZGVtbyBkZSBodW1vIDEyMw==" \
+  -H "Origin: $BASE" "$BASE/ws" 2>/dev/null | head -n 1 | tr -d '\r')
+case "$WS" in
+  *101*) check "handshake del WebSocket en /ws" "101" "101" ;;
+  *)     check "handshake del WebSocket en /ws" "${WS:-sin respuesta}" "101" ;;
+esac
+
 echo; echo "$ok ok, $fallo fallas"
 [ "$fallo" -eq 0 ]

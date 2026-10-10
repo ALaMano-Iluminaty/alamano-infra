@@ -1,6 +1,6 @@
 # ALaManoApp completo. Los servicios se construyen desde los repos hermanos.
 #
-#   Local:  docker compose up --build            -> http://localhost:8080
+#   Local:  docker compose up --build            -> http://localhost:8080  (los 5 servicios)
 #   VM:     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 #
 # Estructura esperada (todos en la misma carpeta):
@@ -126,31 +126,41 @@ services:
     restart: unless-stopped
     networks: [alamano-net]
 
-  # --- Pendientes: necesitan un Dockerfile en su repo (ver Dockerfile.template) ---
-  # Mientras no exista, levanta solo lo de arriba:
-  #   docker compose up -d postgres redis rabbitmq auth-service core-service nginx
-
   realtime-gateway:
-    profiles: [gateway]
     build: ../alamano-realtime-gateway
+    image: ghcr.io/alamano-iluminaty/alamano-realtime-gateway:latest
     container_name: alamano-realtime-gateway
     environment:
-      # CONFIRMAR con Sebastian los nombres exactos de su application.yml
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
       RABBITMQ_USER: ${RABBITMQ_USER:-alamano}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-alamano}
+      # Igual que el Core: el Gateway la lee como recurso de Spring, con prefijo file:.
       JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      # Origenes que acepta el handshake del WebSocket. Su default solo permite
+      # localhost, asi que en la VM hay que poner el dominio o el navegador se
+      # conecta y el Gateway le corta el handshake. Lo sobreescribe el prod.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173}
     volumes:
       - ./keys:/keys:ro
     depends_on:
       rabbitmq: { condition: service_healthy }
+    healthcheck:
+      # Su imagen es eclipse-temurin:21-jre (Ubuntu) y no trae curl ni wget,
+      # asi que se comprueba el puerto con el /dev/tcp de bash.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8083"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     restart: unless-stopped
     networks: [alamano-net]
 
   frontend:
-    profiles: [frontend]
     build: ../alamano-frontend
+    image: ghcr.io/alamano-iluminaty/alamano-frontend:latest
     container_name: alamano-frontend
+    # Su Dockerfile ya trae HEALTHCHECK contra /healthz: no hace falta otro.
     restart: unless-stopped
     networks: [alamano-net]
 
@@ -164,5 +174,7 @@ services:
     depends_on:
       - auth-service
       - core-service
+      - realtime-gateway
+      - frontend
     restart: unless-stopped
     networks: [alamano-net]

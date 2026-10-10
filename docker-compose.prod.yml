@@ -2,12 +2,13 @@
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 # Requiere DOMAIN en el .env, por ejemplo alamano.eastus.cloudapp.azure.com
 
-# Memoria: los dos servicios Java arrancan con -XX:MaxRAMPercentage=75, que es
-# el 75% de lo que el contenedor VE. Sin mem_limit cada JVM ve toda la RAM de la
-# VM y pide el 75% para si sola; con dos, la maquina se queda sin memoria.
+# Memoria: Auth y Core arrancan con -XX:MaxRAMPercentage=75, que es el 75% de lo
+# que el contenedor VE. Sin mem_limit cada JVM ve toda la RAM de la VM y pide el
+# 75% para si sola; con tres servicios Java, la maquina se queda sin memoria.
 # Con mem_limit cada JVM se dimensiona contra su propio limite.
-# Los valores de abajo suman ~2.7 GB y asumen una VM de 4 GB (B2s).
-# Para una de 2 GB (B1ms): auth y core 448m, postgres 256m, rabbitmq 256m, redis 96m.
+# Los valores de abajo suman ~2.6 GB y entran de sobra en una VM de 8 GB.
+# Para una de 4 GB (B2s) sirven igual; para una de 2 GB (B1ms): auth y core 448m,
+# gateway 320m, postgres 256m, rabbitmq 256m, redis 96m.
 
 services:
   # En la VM no se compila: se usan las imagenes que publico el CI al mergear.
@@ -18,6 +19,20 @@ services:
   core-service:
     pull_policy: always
     mem_limit: 640m
+
+  realtime-gateway:
+    pull_policy: always
+    # Su Dockerfile fija -Xmx256m, asi que no depende de MaxRAMPercentage.
+    mem_limit: 384m
+    environment:
+      # El navegador llega por el dominio, no por localhost: sin esto el
+      # handshake del WebSocket se rechaza y el mapa nunca recibe eventos.
+      ALLOWED_ORIGINS: https://${DOMAIN:?Falta DOMAIN en el .env}
+
+  frontend:
+    pull_policy: always
+    # Solo nginx sirviendo estaticos.
+    mem_limit: 128m
 
   postgres:
     mem_limit: 512m

@@ -15,9 +15,8 @@ Los repos van como hermanos, en la misma carpeta:
       alamano-realtime-gateway/
       alamano-frontend/
 
-Cada servicio necesita un `Dockerfile` en su raíz. `alamano-auth-service` y
-`alamano-core-service` ya lo tienen. Para los otros dos están `Dockerfile.template` y
-`Dockerfile.frontend.template`.
+Los cuatro servicios ya tienen su `Dockerfile`. Los archivos `Dockerfile.template` y
+`Dockerfile.frontend.template` quedan solo como referencia histórica.
 
 ## Arrancar en local
 
@@ -28,11 +27,11 @@ docker compose up --build     # http://localhost:8080
 bash scripts/smoke.sh         # prueba de humo de punta a punta
 ```
 
-El Gateway y el Frontend están detrás de un perfil, porque todavía no tienen
-`Dockerfile`. Cuando lo tengan:
+Eso levanta los cinco servicios: Auth, Core, Gateway, Frontend y nginx adelante. Si
+quieres solo el backend mientras trabajas en otra cosa:
 
 ```bash
-docker compose --profile gateway --profile frontend up --build
+docker compose up -d postgres redis rabbitmq auth-service core-service nginx
 ```
 
 ## Rutas
@@ -42,7 +41,15 @@ docker compose --profile gateway --profile frontend up --build
 | `/` | frontend | |
 | `/auth/*` | auth-service `:8081` | el prefijo **no** se recorta |
 | `/api/*` | core-service `:8082` | el prefijo **no** se recorta |
-| `/ws` | realtime-gateway `:8083` | WebSocket; confirmar la ruta exacta |
+| `/ws` | realtime-gateway `:8083` | WebSocket/STOMP crudo, sin SockJS |
+
+El frontend no sabe en qué host vive: pide `/api`, `/auth` y `/ws` relativos y el
+navegador los completa. Por eso la misma imagen sirve en local y en la VM.
+
+El Gateway solo acepta el handshake del WebSocket si la cabecera `Origin` está en su
+`ALLOWED_ORIGINS`. Su valor por defecto es `localhost`, así que en la VM
+`docker-compose.prod.yml` lo cambia a `https://$DOMAIN`. Si el mapa se queda sin
+eventos, eso es lo primero que hay que mirar.
 
 Postgres, Redis y RabbitMQ solo escuchan en `127.0.0.1`: nunca quedan expuestos a
 internet. El panel de RabbitMQ queda en `localhost:15672`.
@@ -59,6 +66,7 @@ Cada servicio la pide distinto, y es fácil equivocarse:
 |---|---|---|
 | auth-service | `JWT_PRIVATE_KEY_PATH` y `JWT_PUBLIC_KEY_PATH` | ruta simple: `/keys/jwt-private.pem` |
 | core-service | `JWT_PUBLIC_KEY_LOCATION` | recurso de Spring: `file:/keys/jwt-public.pem` |
+| realtime-gateway | `JWT_PUBLIC_KEY_LOCATION` | recurso de Spring: `file:/keys/jwt-public.pem` |
 
 El Core la lee como recurso de Spring, por eso lleva el prefijo `file:` y la variable se
 llama `LOCATION`, no `PATH`. Con el nombre equivocado la variable se ignora, el Core usa
@@ -116,7 +124,7 @@ Para actualizar después de un merge: `bash scripts/deploy.sh`.
 | `gen-keys.sh` | Genera el par RS256 en `./keys`. No pisa unas que ya existan. |
 | `bootstrap-vm.sh` | Prepara una VM Ubuntu nueva: Docker y swap. |
 | `deploy.sh` | `git pull` de todos los repos y reconstruye lo que cambió. |
-| `smoke.sh` | Registro, login, publicar promoción y 401 sin token. `BASE=https://... bash scripts/smoke.sh` |
+| `smoke.sh` | 7 pruebas: registro, login, publicar y consultar promoción, 401 sin token, el frontend en `/` y el handshake del WebSocket. `BASE=https://... bash scripts/smoke.sh` |
 
 ## Reglas
 
@@ -132,6 +140,10 @@ Para actualizar después de un merge: `bash scripts/deploy.sh`.
 
 El CI de cada servicio publica su imagen en GHCR al mergear. El compose las nombra con
 esa misma etiqueta, así que `docker compose build` las deja listas para subir. Los
-paquetes de una organización nacen privados: si quieres que la VM las descargue en vez
-de compilarlas, hay que hacer `docker login ghcr.io` allá o poner el paquete en público.
-Por defecto el compose compila desde el código, que no necesita autenticación.
+paquetes de una organización **nacen privados**: hay que ponerlos en público
+(*Package settings → Change visibility*) o la VM no los puede descargar. Son cuatro:
+
+    alamano-auth-service      alamano-core-service
+    alamano-realtime-gateway  alamano-frontend
+
+En local no hace falta nada de esto: `docker compose up --build` compila desde el código.
