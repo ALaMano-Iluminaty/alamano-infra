@@ -86,14 +86,16 @@ seq 1 "$CLIENTES" | xargs -P "$PARALELO" -I{} bash -c '
         echo "sin-token" > "$TMP/code-{}"
         exit 0
     fi
-    curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/api/services" \
+    curl -s -o /dev/null -w "%{http_code}\n" -X POST "$BASE/api/services" \
         -H "Content-Type: application/json" -H "Authorization: Bearer $token" \
         -d "{\"professionalId\":\"'"$PRO"'\"}" > "$TMP/code-{}"'
 DURACION=$(( $(date +%s) - INICIO ))
 echo "   terminaron en ${DURACION}s"
 
 echo ">> 4/4  resultados"
-CODIGOS=$(cat "$TMP"/code-* 2>/dev/null)
+# Un codigo por archivo. awk lo lee bien aunque el archivo no termine en salto
+# de linea, que fue justo lo que rompio la primera version de este script.
+CODIGOS=$(awk 'FNR==1{print $1}' "$TMP"/code-* 2>/dev/null)
 GANADORES=$(grep -c '^201$' <<<"$CODIGOS")
 CONFLICTO=$(grep -c '^409$' <<<"$CODIGOS")
 OTROS=$(grep -v -e '^201$' -e '^409$' <<<"$CODIGOS" | grep -c .)
