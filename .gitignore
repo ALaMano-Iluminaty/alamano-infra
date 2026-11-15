@@ -5,3 +5,4 @@ keys/*
 .smoke_body
 k6/tokens.json
 k6/results.json
+resultados/

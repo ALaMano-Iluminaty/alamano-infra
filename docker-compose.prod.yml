@@ -45,7 +45,11 @@ services:
     ports: !reset []          # ya no se publica: solo Caddy habla con internet
 
   caddy:
-    image: caddy:2-alpine
+    # Caddy con el plugin de rate limit (caddy/Dockerfile). La imagen la publica el CI
+    # de este repo; en la VM se descarga como las demas.
+    build: ./caddy
+    image: ghcr.io/alamano-iluminaty/alamano-caddy:latest
+    pull_policy: always
     container_name: alamano-caddy
     environment:
       DOMAIN: ${DOMAIN:?Falta DOMAIN en el .env}
