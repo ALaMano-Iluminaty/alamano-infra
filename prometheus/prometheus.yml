@@ -1,0 +1,52 @@
+# HU-Q10: recoleccion cada 15 s. Los servicios exponen /actuator/prometheus (Spring
+# Actuator + Micrometer). Los targets que no esten levantados (p. ej. core-service-2 sin
+# el override ha) simplemente aparecen como "down" en el tablero.
+#
+# Para la topologia de 4 VMs se reemplazan los nombres de servicio por las IPs privadas
+# de cada maquina (ver docs/topologia-4-vms.md).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: auth
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["auth-service:8081"]
+        labels: { instance_name: auth-1 }
+
+  - job_name: core
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["core-service:8082"]
+        labels: { instance_name: core-1 }
+      - targets: ["core-service-2:8082"]
+        labels: { instance_name: core-2 }
+
+  - job_name: gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["realtime-gateway:8083"]
+        labels: { instance_name: gateway-1 }
+      - targets: ["realtime-gateway-2:8083"]
+        labels: { instance_name: gateway-2 }
+
+  # Plugin rabbitmq_prometheus (rabbitmq/enabled_plugins): colas, mensajes listos, consumidores.
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  # CPU y memoria por contenedor.
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # CPU y memoria de la maquina completa.
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels: { maquina: unica }

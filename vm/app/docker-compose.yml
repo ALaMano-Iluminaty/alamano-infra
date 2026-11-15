@@ -1,0 +1,82 @@
+# VM de aplicacion (ver docs/topologia-4-vms.md). Cada una de las dos VMs app corre
+# una instancia completa de los tres servicios Java. No tienen IP publica: el trafico
+# entra desde Caddy en la VM de entrada por la red privada.
+#
+#   docker compose -f docker-compose.yml up -d
+#
+# Requiere .env con las IPs privadas de la VM de datos (DB_HOST, REDIS_HOST, RABBIT_HOST).
+# JaCoCo/jwt-public.pem debe estar en ../../keys antes de levantar.
+
+services:
+  auth-service:
+    image: ghcr.io/alamano-iluminaty/alamano-auth-service:latest
+    pull_policy: always
+    container_name: alamano-auth-service
+    environment:
+      HOSTNAME: ${HOSTNAME}
+      JWT_PRIVATE_KEY_LOCATION: file:/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST}:5432/alamano?currentSchema=auth
+      SPRING_DATASOURCE_USERNAME: ${AUTH_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD}
+      APP_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+    ports: ["8081:8081"]
+    volumes:
+      - ../../keys:/keys:ro
+    restart: unless-stopped
+
+  core-service:
+    image: ghcr.io/alamano-iluminaty/alamano-core-service:latest
+    pull_policy: always
+    container_name: alamano-core-service
+    environment:
+      HOSTNAME: ${HOSTNAME}
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST}:5432/alamano?currentSchema=core
+      SPRING_DATASOURCE_USERNAME: ${CORE_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${CORE_DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: ${REDIS_HOST}
+      SPRING_RABBITMQ_HOST: ${RABBIT_HOST}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+    ports: ["8082:8082"]
+    volumes:
+      - ../../keys:/keys:ro
+    restart: unless-stopped
+
+  realtime-gateway:
+    image: ghcr.io/alamano-iluminaty/alamano-realtime-gateway:latest
+    pull_policy: always
+    container_name: alamano-realtime-gateway
+    environment:
+      HOSTNAME: ${HOSTNAME}
+      RABBITMQ_HOST: ${RABBIT_HOST}
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    ports: ["8083:8083"]
+    volumes:
+      - ../../keys:/keys:ro
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: alamano-node-exporter
+    command: ["--path.rootfs=/host"]
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: alamano-cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped

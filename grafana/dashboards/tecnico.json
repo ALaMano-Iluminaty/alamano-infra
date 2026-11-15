@@ -1,0 +1,103 @@
+{
+  "uid": "alamano-tecnico",
+  "title": "ALaMano - Tablero tecnico",
+  "tags": ["alamano", "HU-Q10"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Estado de instancias",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "up{job=~\"auth|core|gateway|rabbitmq\"}", "legendFormat": "{{job}} {{instance_name}}{{instance}}", "instant": true }],
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "fieldConfig": { "defaults": { "mappings": [
+        { "type": "value", "options": { "0": { "text": "CAIDA", "color": "red" }, "1": { "text": "OK", "color": "green" } } } ],
+        "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Tiempo de respuesta HTTP p95 (s)",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, application) (rate(http_server_requests_seconds_bucket{uri!~\"/actuator.*\"}[1m])))", "legendFormat": "{{application}} p95" },
+        { "expr": "sum by (application) (rate(http_server_requests_seconds_sum{uri!~\"/actuator.*\"}[1m])) / sum by (application) (rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[1m]))", "legendFormat": "{{application}} promedio" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.3 }] } } }
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Latencia de eventos Core -> Gateway p95 (s)",
+      "description": "alamano_event_latency: desde occurredAt del evento hasta que el Gateway lo reparte por STOMP. AC HU-Q6: p95 <= 0.5 s.",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum by (le, type) (rate(alamano_event_latency_seconds_bucket[1m])))", "legendFormat": "{{type}} p95" },
+        { "expr": "sum by (instance_name) (rate(alamano_event_latency_seconds_count[1m]))", "legendFormat": "eventos/s {{instance_name}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.5 }] } } }
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Usuarios concurrentes",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (instance_name) (alamano_ws_sessions_active)", "legendFormat": "WebSocket {{instance_name}}" },
+        { "expr": "sum by (application) (http_server_requests_active_seconds_active_count)", "legendFormat": "HTTP en curso {{application}}" }
+      ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Peticiones y errores por segundo",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (application) (rate(http_server_requests_seconds_count{uri!~\"/actuator.*\"}[1m]))", "legendFormat": "{{application}} total" },
+        { "expr": "sum by (application) (rate(http_server_requests_seconds_count{status=~\"5..\"}[1m]))", "legendFormat": "{{application}} 5xx" },
+        { "expr": "sum by (application) (rate(http_server_requests_seconds_count{status=~\"401|403|429\"}[1m]))", "legendFormat": "{{application}} rechazadas 401/403/429" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "CPU por contenedor (%)",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"alamano.*\"}[1m])) * 100", "legendFormat": "{{name}}" },
+        { "expr": "100 - avg by (maquina) (rate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100", "legendFormat": "maquina {{maquina}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 80 }] } } }
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Memoria por contenedor",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "container_memory_working_set_bytes{name=~\"alamano.*\"}", "legendFormat": "{{name}}" },
+        { "expr": "sum by (application, instance_name) (jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "heap {{application}} {{instance_name}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "RabbitMQ: profundidad de colas",
+      "description": "AC HU-Q6: la cola no debe crecer de forma sostenida durante la prueba.",
+      "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "rabbitmq_queue_messages_ready", "legendFormat": "listos" },
+        { "expr": "rabbitmq_queue_messages_unacked", "legendFormat": "sin confirmar" },
+        { "expr": "rate(rabbitmq_global_messages_delivered_total[1m])", "legendFormat": "entregados/s" }
+      ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "JVM: hilos y GC",
+      "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (application, instance_name) (jvm_threads_live_threads)", "legendFormat": "hilos {{application}} {{instance_name}}" },
+        { "expr": "sum by (application, instance_name) (rate(jvm_gc_pause_seconds_sum[1m]))", "legendFormat": "GC s/s {{application}} {{instance_name}}" }
+      ]
+    }
+  ]
+}

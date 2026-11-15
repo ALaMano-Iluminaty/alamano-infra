@@ -1,0 +1,75 @@
+# HU-Q10: Prometheus (recoleccion cada 15 s) y Grafana con el tablero tecnico.
+# Tambien cAdvisor (CPU y memoria por contenedor), node-exporter (por maquina) y el
+# plugin de Prometheus de RabbitMQ (profundidad de colas).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.observabilidad.yml up -d
+#   (se puede combinar con prod y ha)
+#
+#   Grafana:    http://localhost:3000   (admin / GRAFANA_ADMIN_PASSWORD, por defecto admin)
+#               en la VM: https://$DOMAIN/grafana
+#   Prometheus: http://localhost:9090   (solo local; en la VM por tunel SSH)
+
+services:
+  rabbitmq:
+    volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: alamano-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - alamano_prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: alamano-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # Servido bajo /grafana detras de Caddy; en local tambien funciona en :3000.
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - alamano_grafana_data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on: [prometheus]
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: alamano-cadvisor
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: alamano-node-exporter
+    command: ["--path.rootfs=/host"]
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+    networks: [alamano-net]
+
+volumes:
+  alamano_prometheus_data:
+  alamano_grafana_data:

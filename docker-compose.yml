@@ -82,6 +82,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/alamano?currentSchema=auth
       SPRING_DATASOURCE_USERNAME: ${AUTH_DB_USER:-auth_app}
       SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:-auth_app}
+      # HU-G2: Google Sign-In. Si queda vacio, /auth/google responde 401.
+      APP_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     volumes:
       - ./keys:/keys:ro
     depends_on:

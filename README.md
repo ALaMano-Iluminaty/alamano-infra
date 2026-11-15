@@ -54,6 +54,63 @@ eventos, eso es lo primero que hay que mirar.
 Postgres, Redis y RabbitMQ solo escuchan en `127.0.0.1`: nunca quedan expuestos a
 internet. El panel de RabbitMQ queda en `localhost:15672`.
 
+## Modos de despliegue
+
+Hay tres overrides que se encadenan. Cada uno suma algo encima del compose base:
+
+| Archivo | Para que sirve |
+|---|---|
+| `docker-compose.prod.yml` | VM: Caddy con TLS adelante, `pull_policy: always`, limites de memoria. |
+| `docker-compose.2gw.yml` | Dos Gateways detras de nginx (HU-Q1 de Dev B). |
+| `docker-compose.ha.yml` | **2 Core + 2 Gateway detras de Caddy con healthchecks** (HU-Q1 de Dev D). |
+| `docker-compose.observabilidad.yml` | Prometheus (15 s), Grafana con el tablero tecnico, cAdvisor, node-exporter y el plugin Prometheus de RabbitMQ (HU-Q10). |
+
+Ejemplo, todo junto en local:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.ha.yml \
+  -f docker-compose.observabilidad.yml \
+  up --build
+# Grafana en http://localhost:3000 (admin / ${GRAFANA_ADMIN_PASSWORD}, por defecto admin)
+```
+
+## Rate limit (HU-Q4)
+
+100 peticiones por minuto por IP en `/auth` y `/api`, con `429` cuando se supera.
+
+- **Caddy** aplica el limite en el borde (`caddy/Caddyfile` y `.ha`). El plugin
+  `caddy-ratelimit` no viene en la imagen oficial, asi que este repo publica una
+  imagen propia en GHCR (`ghcr.io/alamano-iluminaty/alamano-caddy`) construida con
+  `caddy/Dockerfile` por el workflow `.github/workflows/caddy-image.yml`.
+- **nginx** repite la regla detras de Caddy (`nginx/nginx.conf` y `nginx-2gw.conf`),
+  por si en algun escenario entra trafico directo a nginx (sin Caddy).
+
+Nginx confia en `X-Forwarded-For` solo cuando viene de la red interna de Docker
+(`set_real_ip_from`), asi nadie desde fuera puede saltarse el limite falsificando
+su IP.
+
+## Pruebas de calidad (Sprint 2)
+
+Todos los scripts dejan sus resultados en `resultados/` (gitignored).
+
+| HU | Script | Que mide |
+|---|---|---|
+| Q1 | `scripts/prueba-disponibilidad.sh` | 200 usuarios, tumba una instancia al minuto 3; exito >= 99 %, reconexion WS <= 30 s. |
+| Q6 | `k6/run.sh` + `scripts/medir-recursos.sh` | 50 barberos + 250 clientes WS 10 min; p95 < 500 ms, CPU/cola. |
+| Q7-Q8 | `scripts/correr-ha.sh` | Cargas de reserva y promocion contra HA; p95 <= 300 ms, 1 reserva/slot. |
+| Q9 | `scripts/prueba-cercanos.sh` | 250 clientes cada 5 s por 10 min; p95 <= 300 ms, cache >= 80 %. |
+
+Plantilla para anotar numeros: [docs/resultados-rendimiento.md](docs/resultados-rendimiento.md).
+
+## Topologia de 4 VMs (produccion real)
+
+Ver [docs/topologia-4-vms.md](docs/topologia-4-vms.md): 1 VM entrada, 2 VMs app
+(detras de Caddy en la de entrada), 1 VM datos. El aprovisionamiento esta en
+`scripts/provision-azure.sh` (Azure CLI); cada VM levanta solo su parte con los
+compose de `vm/entrada`, `vm/app`, `vm/datos`.
+
 ## Las llaves RS256
 
 Auth firma con la privada; Core y el Gateway verifican con la pública. Los tres montan
