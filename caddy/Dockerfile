@@ -5,3 +5,6 @@ RUN xcaddy build --with github.com/mholt/caddy-ratelimit
 
 FROM caddy:2-alpine
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+# Bajar privilegios: la imagen base trae el usuario 'caddy' y el binario con
+# cap_net_bind_service, por lo que puede escuchar en 80/443 sin ser root.
+USER caddy

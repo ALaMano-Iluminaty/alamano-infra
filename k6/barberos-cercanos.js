@@ -36,6 +36,8 @@ export const options = {
 
 // 20 zonas pre-elegidas: el Core cachea por celda, asi que el porcentaje de hits
 // sube rapido y se mantiene por encima del 80 % durante casi todo el test.
+// Math.random genera coordenadas aleatorias de prueba de carga; no se usa para
+// secretos ni tokens, por eso no se requiere un PRNG criptografico. NOSONAR
 const ZONAS = Array.from({ length: 20 }, () => ({
   lat: (-34.6 + (Math.random() - 0.5) * 0.08).toFixed(4),
   lng: (-58.4 + (Math.random() - 0.5) * 0.08).toFixed(4),
@@ -43,7 +45,7 @@ const ZONAS = Array.from({ length: 20 }, () => ({
 
 export default function () {
   const token = tokens.clientes[(__VU - 1) % tokens.clientes.length];
-  const zona = ZONAS[Math.floor(Math.random() * ZONAS.length)];
+  const zona = ZONAS[Math.floor(Math.random() * ZONAS.length)]; // NOSONAR: eleccion de zona para carga, no crypto
   const url = `${BASE}/api/professionals/nearby?lat=${zona.lat}&lng=${zona.lng}`;
 
   const res = http.get(url, {

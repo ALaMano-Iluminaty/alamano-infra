@@ -59,6 +59,8 @@ export function httpCliente() {
 
   // Dos endpoints reales del Core, montados detras de /api.
   const endpoints = ['/api/professionals/nearby?lat=-34.6&lng=-58.4', '/api/services/active'];
+  // Math.random en pruebas de carga reparte el trafico entre endpoints; no se usa
+  // para generar secretos ni tokens, por eso no aplica un PRNG criptografico. NOSONAR
   const url = BASE + endpoints[Math.floor(Math.random() * endpoints.length)];
 
   const res = http.get(url, { headers, timeout: '10s', tags: { endpoint: url } });
@@ -68,7 +70,7 @@ export function httpCliente() {
   httpErrors.add(!ok);
   check(res, { 'no 5xx': (r) => r.status < 500, 'no timeout': (r) => r.status !== 0 });
 
-  sleep(1 + Math.random());
+  sleep(1 + Math.random()); // NOSONAR: jitter entre peticiones, no es crypto
 }
 
 export function wsCliente() {
