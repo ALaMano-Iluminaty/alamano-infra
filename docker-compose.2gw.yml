@@ -1,0 +1,48 @@
+# Compose override: 2 instancias del Gateway detrás de nginx.
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.2gw.yml up --build
+#
+# Verificación de disponibilidad (HU-Q1):
+#   1. Conectar un barbero vía WebSocket → queda en gateway-1 o gateway-2.
+#   2. docker compose stop realtime-gateway      (matar una instancia)
+#   3. Verificar en logs de core-service: professional.connection.lost
+#   4. El frontend reconecta al barbero a la instancia viva.
+#   5. docker compose start realtime-gateway      (volver a levantar)
+
+services:
+  realtime-gateway:
+    container_name: alamano-gateway-1
+    environment:
+      HOSTNAME: gateway-1
+
+  realtime-gateway-2:
+    build: ../alamano-realtime-gateway
+    image: ghcr.io/alamano-iluminaty/alamano-realtime-gateway:latest
+    container_name: alamano-gateway-2
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-alamano}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-alamano}
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      HOSTNAME: gateway-2
+    volumes:
+      - ./keys:/keys:ro
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8083"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  nginx:
+    volumes:
+      - ./nginx/nginx-2gw.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - realtime-gateway
+      - realtime-gateway-2
