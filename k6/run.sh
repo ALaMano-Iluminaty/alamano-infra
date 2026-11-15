@@ -18,7 +18,7 @@ fi
 # Genera tokens si no existen o si se pasó una llave explícita
 if [[ ! -f "$SCRIPT_DIR/tokens.json" || -n "$PRIVATE_KEY" ]]; then
   echo "Generando tokens de prueba..."
-  bash "$SCRIPT_DIR/gen-tokens.sh" ${PRIVATE_KEY:+"$PRIVATE_KEY"}
+  node "$SCRIPT_DIR/gen-tokens.js" ${PRIVATE_KEY:+"$PRIVATE_KEY"}
 fi
 
 echo "Iniciando prueba contra $GATEWAY_URL"
