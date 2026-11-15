@@ -1,0 +1,39 @@
+# HU-Q5: SonarCloud revisa el IaC de este repo (Docker, YAML, shell, GitHub Actions)
+# en cada PR y push. No hay codigo Java, asi que el analisis es puramente estatico y
+# no necesita build previo.
+name: SonarCloud
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sonar:
+    name: Analisis Sonar
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # SonarCloud compara con el historial para distinguir el codigo nuevo.
+          fetch-depth: 0
+
+      # Espera al Quality Gate y falla si no pasa (regla de supply chain, secretos,
+      # Dockerfile, etc.). Con la rama protegida, el PR no se puede integrar.
+      - name: SonarCloud
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@2f77a1ec69fb1d595b06f35ab27e97605bdef703 # v5
+        with:
+          args: >
+            -Dsonar.organization=alamano-iluminaty
+            -Dsonar.projectKey=ALaMano-Iluminaty_alamano-infra
+            -Dsonar.qualitygate.wait=true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
