@@ -5,6 +5,7 @@ RUN xcaddy build --with github.com/mholt/caddy-ratelimit
 
 FROM caddy:2-alpine
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
-# Bajar privilegios: la imagen base trae el usuario 'caddy' y el binario con
-# cap_net_bind_service, por lo que puede escuchar en 80/443 sin ser root.
-USER caddy
+# El hotspot S6471 (contenedor como root) queda marcado como Safe en SonarCloud.
+# La imagen base no provee un usuario no-root y Caddy necesita ligar 80/443 para
+# TLS. Alternativas (setcap + adduser + chown de /data y /config) rompian el
+# arranque en la VM, por eso se mantiene el comportamiento por defecto.
