@@ -84,6 +84,8 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:-auth_app}
       # HU-G2: Google Sign-In. Si queda vacio, /auth/google responde 401.
       APP_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      # HU-Q3: correos que entran como ADMIN al iniciar sesion con Google (separados por coma).
+      APP_ADMIN_EMAILS: ${ADMIN_EMAILS:-}
     volumes:
       - ./keys:/keys:ro
     depends_on:
