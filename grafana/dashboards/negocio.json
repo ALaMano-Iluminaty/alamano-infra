@@ -1,0 +1,609 @@
+{
+  "uid": "alamano-negocio",
+  "title": "ALaMano - Tablero de negocio",
+  "tags": [
+    "alamano",
+    "HU-Q10"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Sesiones iniciadas",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"auth\",uri=~\"/auth/login|/auth/google\",method=\"POST\",status=\"200\"}[$__range]))",
+          "legendFormat": "Sesiones iniciadas",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Inicios de sesion exitosos (correo y Google) en el rango de tiempo elegido."
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Usuarios conectados ahora",
+      "gridPos": {
+        "x": 4,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(alamano_ws_sessions_active)",
+          "legendFormat": "Usuarios conectados ahora",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Conexiones WebSocket abiertas en este momento (clientes y barberos)."
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Reservas creadas",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"core\",uri=\"/api/services\",method=\"POST\",status=~\"2..\"}[$__range]))",
+          "legendFormat": "Reservas creadas",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Servicios reservados con exito."
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Promociones reclamadas",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"core\",uri=~\"/api/promotions/.*claim.*\",method=\"POST\",status=~\"2..\"}[$__range]))",
+          "legendFormat": "Promociones reclamadas",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Cupos de promocion entregados."
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Conflictos resueltos (409)",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"core\",uri=\"/api/services\",method=\"POST\",status=\"409\"}[$__range])) + sum(increase(http_server_requests_seconds_count{job=\"core\",uri=~\"/api/promotions/.*claim.*\",method=\"POST\",status=\"409\"}[$__range]))",
+          "legendFormat": "Conflictos resueltos (409)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Reservas y reclamos rechazados porque otro usuario gano la carrera: la concurrencia funcionando."
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Cuentas nuevas",
+      "gridPos": {
+        "x": 20,
+        "y": 0,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"auth\",uri=\"/auth/register\",method=\"POST\",status=\"201\"}[$__range]))",
+          "legendFormat": "Cuentas nuevas",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Registros completados."
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Sesiones iniciadas por minuto",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (uri)(rate(http_server_requests_seconds_count{job=\"auth\",uri=~\"/auth/login|/auth/google\",method=\"POST\",status=\"200\"}[1m])) * 60",
+          "legendFormat": "{{uri}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "description": "Login con correo (/auth/login) frente a Google (/auth/google)."
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Usuarios conectados en tiempo real",
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(alamano_ws_sessions_active)",
+          "legendFormat": "conectados"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Reservas por minuto",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"core\",uri=\"/api/services\",method=\"POST\",status=~\"2..\"}[1m])) * 60",
+          "legendFormat": "reservadas"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"core\",uri=\"/api/services\",method=\"POST\",status=\"409\"}[1m])) * 60",
+          "legendFormat": "rechazadas (409)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Promociones: reclamos por minuto",
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"core\",uri=~\"/api/promotions/.*claim.*\",method=\"POST\",status=~\"2..\"}[1m])) * 60",
+          "legendFormat": "reclamadas"
+        },
+        {
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"core\",uri=~\"/api/promotions/.*claim.*\",method=\"POST\",status=\"409\"}[1m])) * 60",
+          "legendFormat": "sin cupo (409)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Acciones en tiempo real por minuto",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (type) (rate(alamano_event_latency_seconds_count[1m])) * 60",
+          "legendFormat": "{{type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "description": "Eventos que el Gateway entrega a los clientes: barberos conectados, cambios de estado y ubicaciones."
+    },
+    {
+      "id": 12,
+      "type": "bargauge",
+      "title": "Funcionalidades mas usadas",
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Peticiones por funcionalidad (ruta) en el rango de tiempo elegido.",
+      "targets": [
+        {
+          "expr": "topk(8, sum by (method, uri) (increase(http_server_requests_seconds_count{job=~\"core|auth\",uri!~\"/actuator.*|/error|NOT_FOUND|REDIRECTION|root\"}[$__range])))",
+          "legendFormat": "{{method}} {{uri}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Barberos que se conectaron",
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(http_server_requests_seconds_count{job=\"core\",uri=\"/api/professionals/me/online\",method=\"POST\",status=~\"2..\"}[$__range]))",
+          "legendFormat": "Barberos que se conectaron",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Veces que un barbero se puso disponible en el rango elegido."
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Tiempo medio de la reserva a la llegada",
+      "gridPos": {
+        "x": 4,
+        "y": 28,
+        "w": 8,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(alamano_service_arrival_seconds_sum[$__range])) / sum(rate(alamano_service_arrival_seconds_count[$__range]))",
+          "legendFormat": "Tiempo medio de la reserva a la llegada",
+          "instant": true
+        }
+      ],
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "Pendiente: lo publica el Core",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "description": "Requiere que el Core registre el temporizador alamano.service.arrival (de RESERVED a ARRIVED)."
+    }
+  ]
+}
