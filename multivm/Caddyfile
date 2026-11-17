@@ -1,7 +1,7 @@
 # Entrada (HU-Q1, HU-Q4): Caddy con limite por IP y reparto entre app1 y app2.
 # La imagen es ghcr.io/alamano-iluminaty/alamano-caddy (trae el plugin rate_limit).
 {
-	order rate_limit before reverse_proxy
+	order rate_limit before handle
 }
 
 {$DOMAIN} {

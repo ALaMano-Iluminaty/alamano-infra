@@ -3,7 +3,7 @@
 # entorno para la topologia de 4 VMs (ver docs/topologia-4-vms.md), por ejemplo:
 #   CORE_UPSTREAMS="10.0.1.4:8082 10.0.1.5:8082"
 {
-	order rate_limit before reverse_proxy
+	order rate_limit before handle
 }
 
 {$DOMAIN} {
