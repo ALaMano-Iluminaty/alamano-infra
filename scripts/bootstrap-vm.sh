@@ -2,7 +2,7 @@
 # Se corre UNA vez en la VM Ubuntu recien creada:  bash bootstrap-vm.sh
 set -euo pipefail
 
-curl -fsSL https://get.docker.com | sudo sh
+curl --proto '=https' --tlsv1.2 -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker "$USER"
 
 # 2 GB de swap: compilar varias imagenes Maven en una VM de 4 GB se queda sin RAM.
