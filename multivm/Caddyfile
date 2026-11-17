@@ -1,0 +1,59 @@
+# Entrada (HU-Q1, HU-Q4): Caddy con limite por IP y reparto entre app1 y app2.
+# La imagen es ghcr.io/alamano-iluminaty/alamano-caddy (trae el plugin rate_limit).
+{
+	order rate_limit before reverse_proxy
+}
+
+{$DOMAIN} {
+	@api path /auth/* /api/*
+	rate_limit @api {
+		zone borde {
+			key {remote_host}
+			events {$RATE_EVENTS:100}
+			window 1m
+		}
+		log_key
+	}
+
+	handle /auth/* {
+		reverse_proxy auth-service:8081
+	}
+
+	handle /api/* {
+		reverse_proxy {$APP1_IP}:8082 {$APP2_IP}:8082 {
+			lb_policy round_robin
+			lb_try_duration 5s
+			lb_try_interval 250ms
+			health_uri /actuator/health
+			health_interval 2s
+			health_timeout 1s
+			health_status 2xx
+			fail_duration 10s
+			max_fails 1
+		}
+	}
+
+	handle /ws* {
+		reverse_proxy {$APP1_IP}:8083 {$APP2_IP}:8083 {
+			lb_policy least_conn
+			health_uri /actuator/health
+			health_interval 2s
+			health_timeout 1s
+			health_status 2xx
+			fail_duration 10s
+			max_fails 1
+			transport http {
+				read_timeout 1h
+				write_timeout 1h
+			}
+		}
+	}
+
+	handle /grafana* {
+		reverse_proxy grafana:3000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}

@@ -1,0 +1,64 @@
+# VM de APLICACION (se levanta igual en las dos): una instancia de Core y una de Gateway.
+#   docker compose -f multivm/compose.app.yml --env-file .env up -d
+# Requiere en .env: APP_IP (IP privada de ESTA VM), DATOS_IP, DOMAIN, las
+# contrasenas y la llave publica en ./keys. Solo se publican en la IP privada:
+# los alcanza Caddy desde la VM de entrada y nadie desde internet.
+name: alamano-app
+
+networks:
+  alamano-net:
+
+services:
+  core-service:
+    image: ghcr.io/alamano-iluminaty/alamano-core-service:latest
+    pull_policy: always
+    container_name: alamano-core-service
+    mem_limit: 640m
+    environment:
+      HOSTNAME: ${HOSTNAME:-app}
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DATOS_IP:?Falta DATOS_IP en el .env}:5432/alamano?currentSchema=core
+      SPRING_DATASOURCE_USERNAME: ${CORE_DB_USER:-core_app}
+      SPRING_DATASOURCE_PASSWORD: ${CORE_DB_PASSWORD:?Falta CORE_DB_PASSWORD en el .env}
+      SPRING_DATA_REDIS_HOST: ${DATOS_IP}
+      SPRING_RABBITMQ_HOST: ${DATOS_IP}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-alamano}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en el .env}
+    ports:
+      - "${APP_IP:?Falta APP_IP en el .env}:8082:8082"
+    volumes:
+      - ../keys:/keys:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  realtime-gateway:
+    image: ghcr.io/alamano-iluminaty/alamano-realtime-gateway:latest
+    pull_policy: always
+    container_name: alamano-realtime-gateway
+    mem_limit: 384m
+    environment:
+      HOSTNAME: ${HOSTNAME:-app}
+      RABBITMQ_HOST: ${DATOS_IP}
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-alamano}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en el .env}
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      ALLOWED_ORIGINS: https://${DOMAIN:?Falta DOMAIN en el .env}
+    ports:
+      - "${APP_IP}:8083:8083"
+    volumes:
+      - ../keys:/keys:ro
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8083"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+    networks: [alamano-net]

@@ -1,0 +1,110 @@
+# VM de ENTRADA: Caddy (HTTPS + balanceador), Frontend y Auth.
+#   docker compose -f multivm/compose.entrada.yml --env-file .env up -d
+# Requiere en .env: DOMAIN, APP1_IP, APP2_IP, DATOS_IP y las claves en ./keys.
+name: alamano-entrada
+
+networks:
+  alamano-net:
+
+volumes:
+  caddy_data:
+  caddy_config:
+  prom_data:
+  grafana_data:
+
+services:
+  caddy:
+    image: ghcr.io/alamano-iluminaty/alamano-caddy:latest
+    pull_policy: always
+    container_name: alamano-caddy
+    environment:
+      DOMAIN: ${DOMAIN:?Falta DOMAIN en el .env}
+      APP1_IP: ${APP1_IP:?Falta APP1_IP en el .env}
+      APP2_IP: ${APP2_IP:?Falta APP2_IP en el .env}
+      RATE_EVENTS: ${RATE_EVENTS:-100}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [auth-service, frontend, grafana]
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  auth-service:
+    image: ghcr.io/alamano-iluminaty/alamano-auth-service:latest
+    pull_policy: always
+    container_name: alamano-auth-service
+    mem_limit: 640m
+    environment:
+      HOSTNAME: entrada
+      JWT_PRIVATE_KEY_LOCATION: file:/keys/jwt-private.pem
+      JWT_PUBLIC_KEY_LOCATION: file:/keys/jwt-public.pem
+      APP_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APP_ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      JWT_PRIVATE_KEY_PATH: /keys/jwt-private.pem
+      JWT_PUBLIC_KEY_PATH: /keys/jwt-public.pem
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${DATOS_IP:?Falta DATOS_IP en el .env}:5432/alamano?currentSchema=auth
+      SPRING_DATASOURCE_USERNAME: ${AUTH_DB_USER:-auth_app}
+      SPRING_DATASOURCE_PASSWORD: ${AUTH_DB_PASSWORD:?Falta AUTH_DB_PASSWORD en el .env}
+    volumes:
+      - ../keys:/keys:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  frontend:
+    image: ghcr.io/alamano-iluminaty/alamano-frontend:latest
+    pull_policy: always
+    container_name: alamano-frontend
+    mem_limit: 128m
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: alamano-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prom_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    container_name: alamano-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Falta GRAFANA_ADMIN_PASSWORD en el .env}
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on: [prometheus]
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: alamano-node-exporter
+    command: ["--path.rootfs=/host"]
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+    networks: [alamano-net]
