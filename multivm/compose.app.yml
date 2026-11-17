@@ -62,3 +62,16 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks: [alamano-net]
+
+  # CPU y memoria de ESTA maquina (HU-Q10): Prometheus de la VM de entrada lo raspa por la IP privada.
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: alamano-node-exporter
+    command: ["--path.rootfs=/host"]
+    pid: host
+    ports:
+      - "${APP_IP}:9100:9100"
+    volumes:
+      - /:/host:ro,rslave
+    restart: unless-stopped
+    networks: [alamano-net]
