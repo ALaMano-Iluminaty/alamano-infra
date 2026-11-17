@@ -18,7 +18,6 @@
 import ws from 'k6/ws';
 import { check } from 'k6';
 import { Trend, Counter, Rate } from 'k6/metrics';
-import { SharedArray } from 'k6/data';
 
 // ── Métricas personalizadas ──────────────────────────────────────────────────
 const locationRoundtrip = new Trend('location_roundtrip_ms', true);
@@ -28,7 +27,8 @@ const messagesReceived   = new Counter('messages_received');
 const connectionErrors   = new Rate('connection_errors');
 
 // ── Tokens (generados con gen-tokens.sh) ────────────────────────────────────
-const tokens = new SharedArray('tokens', () => JSON.parse(open('./tokens.json')));
+// tokens.json es un objeto {barberos, clientes}; SharedArray solo admite arrays.
+const tokens = JSON.parse(open('./tokens.json'));
 
 // ── Configuración del test ───────────────────────────────────────────────────
 const TEST_DURATION = '10m';

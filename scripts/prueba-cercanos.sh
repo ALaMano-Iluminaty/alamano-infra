@@ -14,8 +14,8 @@ mkdir -p "$RESULTADOS_DIR"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
 if [[ ! -f "$SCRIPT_DIR/../k6/tokens.json" ]]; then
-  echo ">> generando tokens"
-  node "$SCRIPT_DIR/../k6/gen-tokens.js"
+  echo ">> generando tokens (la llave privada es de root: pide sudo)"
+  sudo bash "$SCRIPT_DIR/../k6/gen-tokens.sh"
 fi
 
 # Hits/misses iniciales. "INFO stats" devuelve un bloque; filtramos lo que importa.
@@ -30,11 +30,18 @@ MISSES_ANTES=${ANTES[1]:-0}
 echo "    hits=$HITS_ANTES  misses=$MISSES_ANTES"
 
 echo ">> corriendo k6 (10 min)"
-k6 run \
-  --env BASE="$BASE" \
-  --out json="$RESULTADOS_DIR/cercanos-$STAMP.json" \
-  "$SCRIPT_DIR/../k6/barberos-cercanos.js" \
-  | tee "$RESULTADOS_DIR/cercanos-$STAMP.log"
+if command -v k6 >/dev/null 2>&1; then
+  k6 run \
+    --env BASE="$BASE" \
+    --out json="$RESULTADOS_DIR/cercanos-$STAMP.json" \
+    "$SCRIPT_DIR/../k6/barberos-cercanos.js" \
+    | tee "$RESULTADOS_DIR/cercanos-$STAMP.log"
+else
+  # Las VMs no traen k6: se usa la imagen oficial (el resumen queda en el .log).
+  docker run --rm -i --network host -v "$SCRIPT_DIR/../k6:/k6:ro" -w /k6 \
+    -e BASE="$BASE" grafana/k6 run barberos-cercanos.js \
+    | tee "$RESULTADOS_DIR/cercanos-$STAMP.log"
+fi
 
 echo ">> leyendo Redis despues del test"
 mapfile -t DESPUES < <(leer_stats)

@@ -12,12 +12,12 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Trend, Rate } from 'k6/metrics';
-import { SharedArray } from 'k6/data';
 
 const latencia = new Trend('latencia_cercanos_ms', true);
 const errores = new Rate('errores_cercanos');
 
-const tokens = new SharedArray('tokens', () => JSON.parse(open('./tokens.json')));
+// tokens.json es un objeto {barberos, clientes}; SharedArray solo admite arrays.
+const tokens = JSON.parse(open('./tokens.json'));
 const BASE = __ENV.BASE || 'http://localhost';
 
 export const options = {
@@ -34,18 +34,18 @@ export const options = {
   },
 };
 
-// 20 zonas pre-elegidas: el Core cachea por celda, asi que el porcentaje de hits
-// sube rapido y se mantiene por encima del 80 % durante casi todo el test.
-// Math.random genera coordenadas aleatorias de prueba de carga; no se usa para
-// secretos ni tokens, por eso no se requiere un PRNG criptografico. NOSONAR
-const ZONAS = Array.from({ length: 20 }, () => ({
-  lat: (-34.6 + (Math.random() - 0.5) * 0.08).toFixed(4),
-  lng: (-58.4 + (Math.random() - 0.5) * 0.08).toFixed(4),
+// 20 zonas fijas (cuadricula de 5 x 4 sobre Bogota, separadas 0,02 grados: cada una cae
+// en una celda distinta de la cache del Core). Son deterministas a proposito: este codigo
+// se ejecuta una vez POR USUARIO VIRTUAL, y con Math.random cada uno tendria sus propias
+// zonas y la prueba no mediria la cache compartida.
+const ZONAS = Array.from({ length: 20 }, (_, i) => ({
+  lat: (4.61 + (i % 5) * 0.02).toFixed(4),
+  lng: (-74.1 + Math.floor(i / 5) * 0.02).toFixed(4),
 }));
 
 export default function () {
   const token = tokens.clientes[(__VU - 1) % tokens.clientes.length];
-  const zona = ZONAS[Math.floor(Math.random() * ZONAS.length)]; // NOSONAR: eleccion de zona para carga, no crypto
+  const zona = ZONAS[(__VU + __ITER) % ZONAS.length];
   const url = `${BASE}/api/professionals/nearby?lat=${zona.lat}&lng=${zona.lng}`;
 
   const res = http.get(url, {
