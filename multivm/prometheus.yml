@@ -1,0 +1,40 @@
+# Prometheus de la VM de entrada: raspa cada 15 s por IP privada (HU-Q10).
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: auth
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["auth-service:8081"]
+        labels: { instance_name: auth-1 }
+
+  - job_name: core
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["172.16.0.5:8082"]
+        labels: { instance_name: core-1 }
+      - targets: ["172.16.0.6:8082"]
+        labels: { instance_name: core-2 }
+
+  - job_name: gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["172.16.0.5:8083"]
+        labels: { instance_name: gateway-1 }
+      - targets: ["172.16.0.6:8083"]
+        labels: { instance_name: gateway-2 }
+
+  - job_name: rabbitmq
+    static_configs:
+      - targets: ["172.16.0.4:15692"]
+
+  - job_name: node
+    static_configs:
+      - targets: ["node-exporter:9100"]
+        labels: { maquina: entrada }

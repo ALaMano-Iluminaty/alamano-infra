@@ -1,0 +1,79 @@
+# VM de DATOS: PostgreSQL, Redis y RabbitMQ.
+#   docker compose -f multivm/compose.datos.yml --env-file .env up -d
+# Requiere en .env: DATOS_IP (IP privada de ESTA VM) y todas las contrasenas.
+# Se publican solo en la IP privada: las VMs de entrada y de aplicacion llegan
+# por la red privada; desde internet no se ve ninguno de los tres.
+name: alamano-datos
+
+networks:
+  alamano-net:
+
+volumes:
+  alamano_pg_data:
+  alamano_rabbitmq_data:
+  alamano_redis_data:
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: alamano-postgres
+    mem_limit: 512m
+    environment:
+      POSTGRES_USER: ${POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?Falta POSTGRES_SUPERUSER_PASSWORD en el .env}
+      POSTGRES_DB: alamano
+      AUTH_DB_USER: ${AUTH_DB_USER:-auth_app}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Falta AUTH_DB_PASSWORD en el .env}
+      CORE_DB_USER: ${CORE_DB_USER:-core_app}
+      CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:?Falta CORE_DB_PASSWORD en el .env}
+    volumes:
+      - alamano_pg_data:/var/lib/postgresql/data
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DATOS_IP:?Falta DATOS_IP en el .env}:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_SUPERUSER:-postgres} -d alamano"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: alamano-redis
+    mem_limit: 192m
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - alamano_redis_data:/data
+    ports:
+      - "${DATOS_IP}:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    networks: [alamano-net]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: alamano-rabbitmq
+    mem_limit: 512m
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-alamano}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en el .env}
+    volumes:
+      - ../rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - alamano_rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "${DATOS_IP}:5672:5672"
+      - "${DATOS_IP}:15692:15692"
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+    networks: [alamano-net]
